@@ -1,0 +1,16 @@
+name: RNAseq_kallisto
+channels:
+  - anaconda
+  - conda-forge
+  - r
+  - pcgr
+  - bioconda
+  - defaults
+dependencies:
+  - bbmap=38.57=h14c3975_0
+  - fastp=0.20.0=hdbcaa40_0
+  - fastqc=0.11.8=1
+  - kallisto=0.46.0
+  - multiqc=1.7=py_4
+  - python=3.7.3=h33d41f4_1
+  - r-base=3.5.1=hfb2a302_1009
