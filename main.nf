@@ -15,13 +15,17 @@ if (params.help) {
   log.info '-------------------------------------'
   log.info ''
   log.info 'Usage: '
-  log.info 'nextflow run hg38.RNAseq_STAR-kallisto.simg.nf \
-            --sampleCsv "path/to/sample.csv"'
+  log.info 'nextflow run brucemoran/RNAseq_kallisto \
+            -profile Configuration profile (required: standard,singularity) \
+            --sampleCsv "path/to/sample.csv" \
+            --cdna  "ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz" \
+            --stranded  "rf-stranded"'
   log.info ''
   log.info 'Mandatory arguments:'
   log.info '    --sampleCsv     FILE      CSV format, header to include "sampleID,read1,read2" in case of paired data; no read2 for single-end'
   log.info ''
   log.info 'Optional arguments (must include one!):'
+  log.info '    --stranded     STRING     if data is fr- (first read forward) or rf-stranded (first read reverse); '
   log.info '    --kallistoindex     STRING      suitable kallisto index'
   log.info '    OR'
   log.info '    --cdna     STRING      suitable cDNA fasta file URL'
@@ -30,7 +34,7 @@ if (params.help) {
 }
 
 //set outDir
-params.outDir = "RNAseq"
+params.outDir = "RNAseq_output"
 
 //test kallistoindex
 if(!params.kallistoindex){
@@ -190,9 +194,9 @@ process kallistondx {
 
 /* 3.1: Kallisto
 */
-process kallissto {
+process kallisto {
 
-  publishDir "$params.outDir/$sampleID/kallisto", mode: "copy", pattern: "*"
+  publishDir "$params.outDir/$sampleID/kallisto_fr", mode: "copy", pattern: "*"
 
   input:
   set sampleID, file(reads) from kallistoing
@@ -210,10 +214,9 @@ process kallissto {
     kallisto quant \
       -t 10 \
       -b 100 \
-      --rf-stranded \
       -i $kallistoindex \
-      -o ./ \
-      $reads
+      -o ./ --${params.stranded} $reads
+
   else
     kallisto quant \
       -t 10 \
@@ -221,10 +224,8 @@ process kallissto {
       --single \
       -l 200 \
       -s 30
-      --rf-stranded \
       -i $kallistoindex \
-      -o ./ \
-      $reads
+      -o ./ --${params.stranded} $reads
   fi
   } 2>&1 | tee > $sampleID".kallisto.log.txt"
   """
@@ -237,7 +238,7 @@ fastp_multiqc.mix( kallisto_multiqc ).set { multiqc_multiqc }
 
 process mltiqc {
 
-  publishDir "$params.outDir/multiqc", mode: "copy", pattern: "*"
+  publishDir "multiqc", mode: "copy", pattern: "*"
 
   input:
   file ('*') from multiqc_multiqc.collect()
