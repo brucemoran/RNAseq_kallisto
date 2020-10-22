@@ -16,7 +16,7 @@ if (params.help) {
   log.info ''
   log.info 'Usage: '
   log.info 'nextflow run brucemoran/RNAseq_kallisto \
-            -profile Configuration profile (required: standard,singularity) \
+            -profile Configuration profile (required: genome or sonic, or DIY) \
             --sampleCsv "path/to/sample.csv" \
             --cdna  "ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz" \
             --stranded  "rf-stranded"'
@@ -42,6 +42,9 @@ if(!params.kallistoindex){
     exit 1, "Require --cdna or --kallistoindex input!"
   }
 }
+
+//Java task memory allocation via task.memory
+javaTaskmem = { it.replace(" GB", "g") }
 
 /* 0.00: Input using sample.csv
 */
@@ -87,16 +90,17 @@ process bbduk {
   set val(sampleID), file('*bbduk.fastq.gz') into (kallistoing, fastpposting)
 
   script:
+  def taskmem = task.memory == null ? "" : "-Xmx" + javaTaskmem("${task.memory}")
   """
   {
   TESTR2=\$(echo $read2 | perl -ane 'if(\$_=~m/fastq.gz/){print "FQ";}')
   if [[ \$TESTR2 != "FQ" ]]; then
    ln -s $read1 $sampleID".pre.fastq.gz"
-   reformat.sh ${params.quarter_javamem} \
+   reformat.sh ${taskmem} \
       in=$read1 \
       out="stdin.fastq" \
       tossjunk=T | \
-   bbduk.sh ${params.quarter_javamem} \
+   bbduk.sh ${taskmem} \
       int=t \
       in="stdin.fastq" \
       out=$sampleID".bbduk.fastq.gz" \
@@ -116,12 +120,12 @@ process bbduk {
     ln -s $read1 $sampleID".R1.pre.fastq.gz"
     ln -s $read2 $sampleID".R2.pre.fastq.gz"
 
-    reformat.sh ${params.quarter_javamem} \
+    reformat.sh ${taskmem} \
       in1=$read1 \
       in2=$read2 \
       out="stdout.fastq" \
       tossjunk=T | \
-    bbduk.sh ${params.quarter_javamem} \
+    bbduk.sh ${taskmem} \
       int=t \
       in="stdin.fastq" \
       out1=$sampleID".R1.bbduk.fastq.gz" \

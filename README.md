@@ -10,9 +10,9 @@ Install [NextFlow](https://www.nextflow.io/index.html#GetStarted) and [Singulari
 ### Running the pipeline
 ```
 nextflow run brucemoran/RNAseq_kallisto \
-  -profile standard,singularity \
+  -profile genome or sonic or DIY \
   --sampleCsv sample.rnaseq.csv \
-  --cdna 'ftp://ftp.ensembl.org/pub/grch37/release-100/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh37.cdna.all.fa.gz' \
+  --cdna 'ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz' \
   --stranded rf-stranded
 ```
 
