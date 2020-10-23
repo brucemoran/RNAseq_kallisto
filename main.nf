@@ -93,11 +93,11 @@ process bbduk {
   def taskmem = task.memory == null ? "" : "-Xmx" + javaTaskmem("${task.memory}")
   """
   {
-  TESTR2=\$(echo $read2 | perl -ane 'if(\$_=~m/fastq.gz/){print "FQ";}')
+  TESTR2=\$(echo $read2 | perl -ane 'if(\$_=~m/q.gz/){print "FQ";}')
   if [[ \$TESTR2 != "FQ" ]]; then
    ln -s $read1 $sampleID".pre.fastq.gz"
    reformat.sh ${taskmem} \
-      in=$read1 \
+      in=$sampleID".pre.fastq.gz" \
       out="stdin.fastq" \
       tossjunk=T | \
    bbduk.sh ${taskmem} \
@@ -121,8 +121,8 @@ process bbduk {
     ln -s $read2 $sampleID".R2.pre.fastq.gz"
 
     reformat.sh ${taskmem} \
-      in1=$read1 \
-      in2=$read2 \
+      in1=$sampleID".R1.pre.fastq.gz" \
+      in2=$sampleID".R2.pre.fastq.gz" \
       out="stdout.fastq" \
       tossjunk=T | \
     bbduk.sh ${taskmem} \
@@ -252,6 +252,6 @@ process mltiqc {
 
   script:
   """
-  multiqc -n multiqc_report.html -c ${params.multiqcconfig} -f .
+  multiqc -n multiqc_report.html -c ${params.multiqcConfig} -f .
   """
 }
