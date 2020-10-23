@@ -25,7 +25,7 @@ if (params.help) {
   log.info '    --sampleCsv     FILE      CSV format, header to include "sampleID,read1,read2" in case of paired data; no read2 for single-end'
   log.info ''
   log.info 'Optional arguments (must include one!):'
-  log.info '    --stranded     STRING     if data is fr- (first read forward) or rf-stranded (first read reverse); '
+  log.info '    --stranded     STRING     if data is fr- (first read forward) or rf-stranded (first read reverse), or not stranded (do not use flag, or enter ""); '
   log.info '    --kallistoindex     STRING      suitable kallisto index'
   log.info '    OR'
   log.info '    --cdna     STRING      suitable cDNA fasta file URL'
@@ -211,6 +211,7 @@ process kallisto {
   file('*.kallisto.log.txt') into kallisto_multiqc
 
   script:
+  def stranding = params.stranded == "" ? "" : "--${params.stranded}"
   """
   {
   COUNT=\$(ls | grep fastq | wc -l)
@@ -219,7 +220,7 @@ process kallisto {
       -t 10 \
       -b 100 \
       -i $kallistoindex \
-      -o ./ --${params.stranded} $reads
+      -o ./ ${stranding} $reads
 
   else
     kallisto quant \
@@ -229,7 +230,7 @@ process kallisto {
       -l 200 \
       -s 30
       -i $kallistoindex \
-      -o ./ --${params.stranded} $reads
+      -o ./ ${stranding} $reads
   fi
   } 2>&1 | tee > $sampleID".kallisto.log.txt"
   """
