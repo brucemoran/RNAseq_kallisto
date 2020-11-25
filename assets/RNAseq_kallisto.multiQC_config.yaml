@@ -56,6 +56,10 @@ extra_fn_clean_exts:
     - .sam
     - .sra
     - _fastqc
+    - .pre
+    - .prepre
+    - .post
+    - .postpost
     - type: remove
       pattern: '.sorted'
     - type: remove

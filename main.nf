@@ -79,7 +79,7 @@ process endedness {
 
   script:
   """
-  COUNT=\$(head -n1 $txt | perl -ane '@s=split(/\\,/);print scalar(@s);')
+  COUNT=\$(head -n1 $txt | perl -ane '@s=split(/\\,/); print scalar(@s);')
   if [[ \$COUNT == 2 ]];then
     echo "sampleID,read1,read2" > "inputs.txt"
     tail -n+2 $txt | while read LINE; do
@@ -92,7 +92,7 @@ process endedness {
 }
 
 sampleCsvInput.splitCsv( header: true )
-              .map { row -> [row.sampleID, file(row.read1), file(row.read2)] }
+              .map { row -> [row.sampleID, file(row.read1), file(row.read2, checkIfExists: true)] }
               .set { bbduking }
 
 /* 1.0: Input trimming
@@ -110,17 +110,17 @@ process bbduk {
   def taskmem = task.memory == null ? "" : "-Xmx" + javaTaskmem("${task.memory}")
   """
   {
-  TESTR2=\$(echo $read2 | perl -ane 'if(\$_=~m/q.gz/){print "FQ";}')
+  TESTR2=\$(echo ${read2} | perl -ane 'if(\$_=~m/q.gz/){print "FQ";}')
   if [[ \$TESTR2 != "FQ" ]]; then
-   ln -s $read1 $sampleID".pre.fastq.gz"
+   ln -s ${read1} ${sampleID}".pre.fastq.gz"
    reformat.sh ${taskmem} \
-      in=$sampleID".pre.fastq.gz" \
+      in=${sampleID}".pre.fastq.gz" \
       out="stdin.fastq" \
       tossjunk=T | \
    bbduk.sh ${taskmem} \
       int=t \
       in="stdin.fastq" \
-      out=$sampleID".bbduk.fastq.gz" \
+      out=${sampleID}".bbduk.fastq.gz" \
       k=${params.bbdkmerx} \
       mink=${params.bbdmink} \
       hdist=1 \
@@ -131,22 +131,22 @@ process bbduk {
       ref=${params.bbmapAdapters} \
       tpe \
       tbo \
-      stats=$sampleID".bbduk.adapterstats.txt" \
+      stats=${sampleID}".bbduk.adapterstats.txt" \
       overwrite=T
   else
-    ln -s $read1 $sampleID".R1.pre.fastq.gz"
-    ln -s $read2 $sampleID".R2.pre.fastq.gz"
+    ln -s ${read1} ${sampleID}".R1.pre.fastq.gz"
+    ln -s ${read2} ${sampleID}".R2.pre.fastq.gz"
 
     reformat.sh ${taskmem} \
-      in1=$sampleID".R1.pre.fastq.gz" \
-      in2=$sampleID".R2.pre.fastq.gz" \
+      in1=${sampleID}".R1.pre.fastq.gz" \
+      in2=${sampleID}".R2.pre.fastq.gz" \
       out="stdout.fastq" \
       tossjunk=T | \
     bbduk.sh ${taskmem} \
       int=t \
       in="stdin.fastq" \
-      out1=$sampleID".R1.bbduk.fastq.gz" \
-      out2=$sampleID".R2.bbduk.fastq.gz" \
+      out1=${sampleID}".R1.bbduk.fastq.gz" \
+      out2=${sampleID}".R2.bbduk.fastq.gz" \
       k=${params.bbdkmerx} \
       mink=${params.bbdmink} \
       hdist=1 \
@@ -157,10 +157,10 @@ process bbduk {
       ref=${params.bbmapAdapters} \
       tpe \
       tbo \
-      stats=$sampleID".bbduk.adapterstats.txt" \
+      stats=${sampleID}".bbduk.adapterstats.txt" \
       overwrite=T
   fi
-  } 2>&1 | tee $sampleID".bbduk.runstats.txt"
+  } 2>&1 | tee ${sampleID}".bbduk.runstats.txt"
   """
 }
 
@@ -177,19 +177,18 @@ process fastp {
   file('*.json') into fastp_multiqc
 
   script:
+  def prepost = "${reads}"[0] == "${sampleID}.R1.bbduk.fastq.gz" ? "post" : "pre"
+  def count = "${reads}"[1] == null ? "single" : "paired"
   """
-  PREPOST=\$(ls | grep R1 | grep fastq | perl -ane 'if(\$_=~m/bbduk/){print "post";} else {print "pre";}')
-  COUNT=\$(ls *fastq.gz | wc -l)
-
-  if [[ \$COUNT == 2 ]]; then
+  if [[ ${count} == "paired" ]]; then
     fastp -w ${task.cpus} \
-      -j $sampleID"."\$PREPOST".fastp.json" \
-      --in1 \$(ls | grep R1 | grep fastq.gz) \
-      --in2 \$(ls | grep R2 | grep fastq.gz)
+      -j ${sampleID}.${prepost}.fastp.json \
+      --in1 ${reads}[0] \
+      --in2 ${reads}[1]
   else
     fastp -w ${task.cpus} \
-      -j $sampleID"."\$PREPOST".fastp.json" \
-      --in1 $reads
+      -j ${sampleID}.${prepost}.fastp.json \
+      --in1 ${reads}
   fi
   """
 }
@@ -217,7 +216,7 @@ process kallistondx {
 */
 process kallisto {
 
-  publishDir "$params.outDir/samples", mode: "copy"
+  publishDir "${params.outDir}/samples", mode: "copy"
 
   input:
   set sampleID, file(reads) from kallistoing
@@ -230,15 +229,15 @@ process kallisto {
   script:
   def stranding = params.stranded == "" ? "" : "--${params.stranded}"
   """
-  mkdir -p $sampleID/kallisto
+  mkdir -p ${sampleID}/kallisto
   {
   COUNT=\$(ls | grep fastq | wc -l)
   if [[ \$COUNT != 1 ]]; then
     kallisto quant \
       -t 10 \
       -b 100 \
-      -i $kallistoindex \
-      -o $sampleID/kallisto ${stranding} $reads
+      -i ${kallistoindex} \
+      -o ${sampleID}/kallisto ${stranding} ${reads}
 
   else
     kallisto quant \
@@ -247,10 +246,10 @@ process kallisto {
       --single \
       -l 200 \
       -s 30
-      -i $kallistoindex \
-      -o $sampleID/kallisto ${stranding} $reads
+      -i ${kallistoindex} \
+      -o ${sampleID}/kallisto ${stranding} ${reads}
   fi
-  } 2>&1 | tee > $sampleID/kallisto/$sampleID".kallisto.log.txt"
+  } 2>&1 | tee > ${sampleID}/kallisto/${sampleID}".kallisto.log.txt"
   """
 }
 
@@ -261,7 +260,7 @@ fastp_multiqc.mix( kallisto_multiqc ).set { multiqc_multiqc }
 
 process mltiqc {
 
-  publishDir "$params.outDir/multiqc", mode: "copy", pattern: "*"
+  publishDir "${params.outDir}/multiqc", mode: "copy", pattern: "*"
 
   input:
   file ('*') from multiqc_multiqc.collect()
@@ -281,8 +280,8 @@ process mltiqc {
 
 process RNAseqR {
 
-  publishDir "$params.outDir", mode: "copy", pattern: "*[!.zip]"
-  publishDir "$params.outDir/${params.runID}_RNAseqR", mode: "copy", pattern: "*[.zip]"
+  publishDir "${params.outDir}", mode: "copy", pattern: "*[!.zip]"
+  publishDir "${params.outDir}/${params.runID}_RNAseqR", mode: "copy", pattern: "*[.zip]"
 
   input:
   file (kdirs) from de_kallisto.collect()
@@ -328,12 +327,12 @@ if(params.email){
   workflow.onComplete {
     sleep(1000)
     def subject = """\
-      [brucemoran/RNAseq_kallisto] SUCCESS: $params.runID [$workflow.runName]
+      [brucemoran/RNAseq_kallisto] SUCCESS: ${params.runID} [${workflow.runName}]
       """
       .stripIndent()
     if (!workflow.success) {
         subject = """\
-          [brucemoran/RNAseq_kallisto] FAILURE: $params.runID [$workflow.runName]
+          [brucemoran/RNAseq_kallisto] FAILURE: ${params.runID} [${workflow.runName}]
           """
           .stripIndent()
     }
