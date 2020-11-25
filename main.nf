@@ -6,32 +6,49 @@
 * metrics from picard suite, visualised by multiQC
 */
 
-params.help = ""
+def helpMessage() {
+  log.info"""
+  -----------------------------------------------------------------------
+                  RNASEQ with KALLISTO and RNAseqR PIPELINE
+  -----------------------------------------------------------------------
 
-if (params.help) {
-  log.info ''
-  log.info '-------------------------------------'
-  log.info 'NEXTFLOW RNASEQ QC, TRIM, PSEUDOALIGN'
-  log.info '-------------------------------------'
-  log.info ''
-  log.info 'Usage: '
-  log.info 'nextflow run brucemoran/RNAseq_kallisto \
-            -profile Configuration profile (required: genome or sonic, or DIY) \
-            --sampleCsv "path/to/sample.csv" \
-            --cdna  "ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz" \
-            --stranded  "rf-stranded"'
-  log.info ''
-  log.info 'Mandatory arguments:'
-  log.info '    --sampleCsv     FILE      CSV format, header to include "sampleID,read1,read2" in case of paired data; no read2 for single-end'
-  log.info ''
-  log.info 'Optional arguments (must include one!):'
-  log.info '    --stranded     STRING     if data is fr- (first read forward) or rf-stranded (first read reverse), or not stranded (do not use flag, or enter ""); '
-  log.info '    --kallistoindex     STRING      suitable kallisto index'
-  log.info '    OR'
-  log.info '    --cdna     STRING      suitable cDNA fasta file URL'
-  log.info ''
-  exit 1
+    Usage:
+    nextflow run brucemoran/RNAseq_kallisto \
+              -profile Configuration profile (required: genome or sonic, or DIY) \
+              --sampleCsv "path/to/sample.csv" \
+              --cdna  "ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz" \
+              --stranded  "rf-stranded"
+
+    Mandatory arguments:
+        --sampleCsv       [file]  CSV format, header to include "sampleID,read1,read2" in case of paired data; no read2 for single-end
+
+        --runID           [str]   string naming run and output files
+
+      One of:
+        --kallistoindex   [str]   suitable kallisto index
+        OR
+        --cdna            [str]   suitable cDNA fasta file URL
+
+    Optional arguments:
+        --email           [str]   email address to send RNAseqR, multiQC reports
+
+        --stranded        [str]   if data is fr- (first read forward) or rf-stranded (first read reverse), or not stranded (default: "")
+
+        --metadataCsv     [file]  CSV format, header to include "sample" and any other covariates to use in DE analysis
+
+        --metadataDesign  [str]   string indicating design formula for DE analysis; do not include "~ 0 +", only terms separated by "+" with last term as the covariate to use in DE (all contrasts are made)
+
+        --controlRef      [str]   "reference" level of last covariate in metadataDesign (default: NULL)
+
+        --genomePrefix    [str]   prefix for "_gene_ensembl" datasets found in biomaRt::listDatasets(biomaRt::useMart("ensembl"))\$dataset (default: "hsapiens")
+
+        --msigdbrSpecies  [str]   species name from msigdbr::msigdbr_show_species() (default:"Homo sapiens")
+
+        --msigdbCategory  [str]   category for MsigDB (one of c("H", paste0("C", 1:7))), see gsea-msigdb.org/gsea/msigdb/collections.jsp for details (default: "H")
+    """.stripIndet()
 }
+
+if (params.help) exit 0, helpMessage()
 
 //set outDir
 params.outDir = "RNAseq_output"
@@ -200,19 +217,20 @@ process kallistondx {
 */
 process kallisto {
 
-  publishDir "$params.outDir/$sampleID/kallisto_fr", mode: "copy", pattern: "*"
+  publishDir "$params.outDir/samples", mode: "copy"
 
   input:
   set sampleID, file(reads) from kallistoing
   file(kallistoindex) from kallisto_index
 
   output:
-  file('*') into completedkallisto
-  file('*.kallisto.log.txt') into kallisto_multiqc
+  file("${sampleID}") into de_kallisto
+  file("${sampleID}/kallisto/${sampleID}.kallisto.log.txt") into kallisto_multiqc
 
   script:
   def stranding = params.stranded == "" ? "" : "--${params.stranded}"
   """
+  mkdir -p $sampleID/kallisto
   {
   COUNT=\$(ls | grep fastq | wc -l)
   if [[ \$COUNT != 1 ]]; then
@@ -220,7 +238,7 @@ process kallisto {
       -t 10 \
       -b 100 \
       -i $kallistoindex \
-      -o ./ ${stranding} $reads
+      -o $sampleID/kallisto ${stranding} $reads
 
   else
     kallisto quant \
@@ -230,9 +248,9 @@ process kallisto {
       -l 200 \
       -s 30
       -i $kallistoindex \
-      -o ./ ${stranding} $reads
+      -o $sampleID/kallisto ${stranding} $reads
   fi
-  } 2>&1 | tee > $sampleID".kallisto.log.txt"
+  } 2>&1 | tee > $sampleID/kallisto/$sampleID".kallisto.log.txt"
   """
 }
 
@@ -243,16 +261,100 @@ fastp_multiqc.mix( kallisto_multiqc ).set { multiqc_multiqc }
 
 process mltiqc {
 
-  publishDir "multiqc", mode: "copy", pattern: "*"
+  publishDir "$params.outDir/multiqc", mode: "copy", pattern: "*"
 
   input:
   file ('*') from multiqc_multiqc.collect()
 
   output:
   file('*') into completedmultiqc
+  file("${params.runID}.multiqc_report.html") into sendmail_multiqc
 
   script:
   """
-  multiqc -n multiqc_report.html -c ${params.multiqcConfig} -f .
+  multiqc -n ${params.runID}.multiqc_report.html -c ${params.multiqcConfig} -f .
   """
+}
+
+/* 4.0: DE analysis
+*/
+
+process RNAseqR {
+
+  publishDir "$params.outDir", mode: "copy", pattern: "*[!.zip]"
+  publishDir "$params.outDir/${params.runID}_RNAseqR", mode: "copy", pattern: "*[.zip]"
+
+  input:
+  file (kdirs) from de_kallisto.collect()
+
+  output:
+  file("${params.runID}_RNAseqR") into completedRNAseqR
+  file("${params.runID}_RNAseqR.zip") into sendmail_RNAseqR
+
+  when:
+  params.metadataCsv && params.metadataDesign
+
+  script:
+  def control_ref = params.controlReference == null ? "NULL" : params.controlReference
+  def genome_pref = params.genomePrefix == null ? "hsapiens" : params.genomePrefix
+  """
+  Rscript -e "RNAseqR::run_prep_modules_bm(metadata_csv = \\"${params.metadataCsv}\\", metadata_design = \\"${params.metadataDesign}\\", tag = \\"${params.runID}\\", output_dir = \\"${params.runID}_RNAseqR\\", data_dir = NULL, control_reference = \\"${control_ref}\\", genome_prefix = \\"${genome_pref}\\", msigdb_species = \\"${params.msigdbSpecies}\\")"
+  rm Rplots.pdf
+  zip -r ${params.runID}_RNAseqR.zip ${params.runID}_RNAseqR
+  """
+}
+
+// 4.1: ZIP for sending on sendmail
+// sendmail_RNAseqR.mix(sendmail_multiqc).set { sendmail_all }
+//
+// process zipup {
+//
+//   label 'low_mem'
+//
+//   input:
+//   file(send_all) from sendmail_all.collect()
+//
+//   output:
+//   file("${params.runID}.RNAseq_kallisto.zip") into send_zip
+//
+//   script:
+//   """
+//   zip ${params.runID}.RNAseq_kallisto.zip *
+//   """
+// }
+
+// 5.0: Completion e-mail notification
+if(params.email){
+  workflow.onComplete {
+    sleep(1000)
+    def subject = """\
+      [brucemoran/RNAseq_kallisto] SUCCESS: $params.runID [$workflow.runName]
+      """
+      .stripIndent()
+    if (!workflow.success) {
+        subject = """\
+          [brucemoran/RNAseq_kallisto] FAILURE: $params.runID [$workflow.runName]
+          """
+          .stripIndent()
+    }
+
+    def msg = """\
+      Pipeline execution summary
+      ---------------------------
+      RunID       : ${params.runID}
+      RunName     : ${workflow.runName}
+      Completed at: ${workflow.complete}
+      Duration    : ${workflow.duration}
+      workDir     : ${workflow.workDir}
+      exit status : ${workflow.exitStatus}
+      """
+      .stripIndent()
+
+    def attachments = sendmail_multiqc.toList().getVal()
+
+    sendMail(to: "${params.email}",
+             subject: subject,
+             body: msg,
+             attach: attachments)
+  }
 }

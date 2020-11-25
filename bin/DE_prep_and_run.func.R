@@ -1,0 +1,3 @@
+#! R
+
+##read inputs from
