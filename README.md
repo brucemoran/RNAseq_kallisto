@@ -10,10 +10,9 @@ Install [NextFlow](https://www.nextflow.io/index.html#GetStarted) and [Singulari
 ### Running the pipeline
 ```
 nextflow run brucemoran/RNAseq_kallisto \
-  -profile genome or sonic or DIY \
-  --sampleCsv sample.rnaseq.csv \
-  --cdna 'ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz' \
-  --stranded rf-stranded
+          -profile <genome or sonic, or DIY> \
+          --sampleCsv "path/to/sample.csv" \
+          --cdna  "ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz"
 ```
 
 ### Arguments
@@ -21,21 +20,48 @@ nextflow run brucemoran/RNAseq_kallisto \
 nextflow run brucemoran/RNAseq_kallisto --help
 
 Mandatory arguments:
-  --sampleCsv     FILE      CSV format, header to include "sampleID,read1,read2" in case of paired data; no read2 for single-end
-  --kallistoindex     STRING      suitable kallisto index
-  OR
-  --cdna     STRING      suitable cDNA fasta file URL
+    --sampleCsv       [file]  CSV format, header to include "sampleID,read1,read2" in case of paired data; no read2 for single-end
 
-  Optional arguments (must include one!):
-  --stranded     STRING     'fr-stranded' (first read forward) or 'rf-stranded' (first read reverse);
-```
-N.B. `rf-stranded` is [typical for Illumina stranded protocols](https://rnabio.org/module-09-appendix/0009/12/01/StrandSettings/)
+    --runID           [str]   string naming run and output files
 
-### Format of --sampleCsv:
+  One of:
+    --kallistoindex   [str]   suitable kallisto index
+    OR
+    --cdna            [str]   suitable cDNA fasta file URL
+
+Optional arguments:
+    --email           [str]   email address to send RNAseqR, multiQC reports
+
+    --stranded        [str]   if data is fr- (first read forward) or rf-stranded (first read reverse), or not stranded (default: "")
+
+    --metadataCsv     [file]  CSV format, header to include "sample" and any other covariates to use in DE analysis
+
+    --metadataDesign  [str]   string indicating design formula for DE analysis; do not include "~ 0 +", only terms separated by "+" with last term as the covariate to use in DE (all contrasts are made)
+
+    --controlRef      [str]   "reference" level of last covariate in metadataDesign (default: NULL)
+
+    --genomePrefix    [str]   prefix for "_gene_ensembl" datasets found in biomaRt::listDatasets(biomaRt::useMart("ensembl"))\$dataset (default: "hsapiens")
+
+    --msigdbrSpecies  [str]   species name from msigdbr::msigdbr_show_species() (default:"Homo sapiens")
+
+    --msigdbCategory  [str]   category for MsigDB (one of c("H", paste0("C", 1:7))), see gsea-msigdb.org/gsea/msigdb/collections.jsp for details (default: "H")
 ```
-sampleID,read1,read2
-germ1,/full/path/to/germ1.R1.fastq.gz,/full/path/to/germ1.R2.fastq.gz
-soma1,/full/path/to/soma1.R1.fastq.gz,/full/path/to/soma1.R2.fastq.gz
-soma2,/full/path/to/soma2.R1.fastq.gz,/full/path/to/soma2.R2.fastq.gz
+
+### Nota Benes
 ```
-N.B. headers of `sampleCsv` argument must match above exactly. For each `sampleID`, an output directory is written to `./RNAseq_output` with a `kallisto` directory (tagged with `stranded` argument if used) and the output of Kallisto therein.
+`rf-stranded` is [typical for Illumina stranded protocols](https://rnabio.org/module-09-appendix/0009/12/01/StrandSettings/); Novogene RNAseq (standard) is unstranded, and so use default: ""
+
+Sample format of --sampleCsv input file:
+
+  sampleID,read1,read2
+  germ1,/full/path/to/germ1.R1.fastq.gz,/full/path/to/germ1.R2.fastq.gz
+  soma1,/full/path/to/soma1.R1.fastq.gz,/full/path/to/soma1.R2.fastq.gz
+  soma2,/full/path/to/soma2.R1.fastq.gz,/full/path/to/soma2.R2.fastq.gz
+
+headers of `sampleCsv` argument must match above exactly. For each `sampleID`, an output directory is written to `./RNAseq_output/samples` with a `kallisto` directory (tagged with `stranded` argument if used) and the output of Kallisto therein.
+
+When running RNAseqR R package for DE, include both --metadataCsv with a 'sample' column
+and --metadataDesign which must specify at least one column header from metadataCsv file.
+For designs with more than one covariate, the covariate of interest is last, and the others
+are joined by a '+', e.g. --metadataDesign "cov_1 + weight + cov_of_interest".
+```
