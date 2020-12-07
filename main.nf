@@ -281,14 +281,13 @@ process mltiqc {
 process RNAseqR {
 
   publishDir "${params.outDir}", mode: "copy", pattern: "*[!.zip]"
-  publishDir "${params.outDir}/${params.runID}_RNAseqR", mode: "copy", pattern: "*[.zip]"
+  publishDir "${params.outDir}/", mode: "copy", pattern: "*.zip"
 
   input:
   file (kdirs) from de_kallisto.collect()
 
   output:
-  file("${params.runID}_RNAseqR") into completedRNAseqR
-  file("${params.runID}_RNAseqR.zip") into sendmail_RNAseqR
+  tuple file("${params.runID}_RNAseqR"), file("${params.runID}_RNAseqR.zip") into completedRNAseqR
 
   when:
   params.metadataCsv && params.metadataDesign
@@ -302,25 +301,6 @@ process RNAseqR {
   zip -r ${params.runID}_RNAseqR.zip ${params.runID}_RNAseqR
   """
 }
-
-// 4.1: ZIP for sending on sendmail
-// sendmail_RNAseqR.mix(sendmail_multiqc).set { sendmail_all }
-//
-// process zipup {
-//
-//   label 'low_mem'
-//
-//   input:
-//   file(send_all) from sendmail_all.collect()
-//
-//   output:
-//   file("${params.runID}.RNAseq_kallisto.zip") into send_zip
-//
-//   script:
-//   """
-//   zip ${params.runID}.RNAseq_kallisto.zip *
-//   """
-// }
 
 // 5.0: Completion e-mail notification
 if(params.email){
