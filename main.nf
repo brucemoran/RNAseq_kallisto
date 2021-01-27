@@ -112,7 +112,7 @@ process bbduk {
   TESTR2=\$(echo ${read2} | perl -ane 'if(\$_=~m/q.gz/){print "FQ";}')
   if [[ \$TESTR2 != "FQ" ]]; then
    reformat.sh ${taskmem} \
-      in=${sampleID}".fastq.gz" \
+      in=${read1} \
       out="stdin.fastq" \
       tossjunk=T | \
    bbduk.sh ${taskmem} \
@@ -134,8 +134,8 @@ process bbduk {
   else
 
     reformat.sh ${taskmem} \
-      in1=${sampleID}".R1.fastq.gz" \
-      in2=${sampleID}".R2.fastq.gz" \
+      in1=${read1} \
+      in2=${read2} \
       out="stdout.fastq" \
       tossjunk=T | \
     bbduk.sh ${taskmem} \
