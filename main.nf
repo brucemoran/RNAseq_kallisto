@@ -103,7 +103,7 @@ process bbduk {
   set val(sampleID), file(read1), file(read2) from bbduking
 
   output:
-  set val(sampleID), file('*bbduk.fastq.gz') into (kallistoing, fastpposting)
+  set val(sampleID), file('*bbduk.fastq.gz') into (kallistoing, fastping)
 
   script:
   def taskmem = task.memory == null ? "" : "-Xmx" + javaTaskmem("${task.memory}")
@@ -162,7 +162,6 @@ process bbduk {
 
 /* 1.1: fastp QC
 */
-fastppreing.concat(fastpposting).set { fastping }
 
 process fastp {
 
