@@ -92,7 +92,7 @@ process endedness {
 }
 
 sampleCsvInput.splitCsv( header: true )
-              .map { row -> [row.sampleID, file(row.read1), file(row.read2, checkIfExists: true)] }
+              .map { row -> [row.sampleID, file(row.read1), file(row.read2)] }
               .set { bbduking }
 
 /* 1.0: Input trimming
@@ -112,7 +112,7 @@ process bbduk {
   TESTR2=\$(echo ${read2} | perl -ane 'if(\$_=~m/q.gz/){print "FQ";}')
   if [[ \$TESTR2 != "FQ" ]]; then
    reformat.sh ${taskmem} \
-      in=${sampleID}".pre.fastq.gz" \
+      in=${sampleID}".fastq.gz" \
       out="stdin.fastq" \
       tossjunk=T | \
    bbduk.sh ${taskmem} \
@@ -134,8 +134,8 @@ process bbduk {
   else
 
     reformat.sh ${taskmem} \
-      in1=${sampleID}".R1.pre.fastq.gz" \
-      in2=${sampleID}".R2.pre.fastq.gz" \
+      in1=${sampleID}".R1.fastq.gz" \
+      in2=${sampleID}".R2.fastq.gz" \
       out="stdout.fastq" \
       tossjunk=T | \
     bbduk.sh ${taskmem} \
