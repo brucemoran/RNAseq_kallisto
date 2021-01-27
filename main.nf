@@ -45,7 +45,7 @@ def helpMessage() {
         --msigdbrSpecies  [str]   species name from msigdbr::msigdbr_show_species() (default:"Homo sapiens")
 
         --msigdbCategory  [str]   category for MsigDB (one of c("H", paste0("C", 1:7))), see gsea-msigdb.org/gsea/msigdb/collections.jsp for details (default: "H")
-    """.stripIndet()
+    """.stripIndent()
 }
 
 if (params.help) exit 0, helpMessage()
