@@ -103,7 +103,6 @@ process bbduk {
   set val(sampleID), file(read1), file(read2) from bbduking
 
   output:
-  set val(sampleID), file('*pre.fastq.gz') into fastppreing
   set val(sampleID), file('*bbduk.fastq.gz') into (kallistoing, fastpposting)
 
   script:
@@ -112,7 +111,6 @@ process bbduk {
   {
   TESTR2=\$(echo ${read2} | perl -ane 'if(\$_=~m/q.gz/){print "FQ";}')
   if [[ \$TESTR2 != "FQ" ]]; then
-   ln -s ${read1} ${sampleID}".pre.fastq.gz"
    reformat.sh ${taskmem} \
       in=${sampleID}".pre.fastq.gz" \
       out="stdin.fastq" \
@@ -134,8 +132,6 @@ process bbduk {
       stats=${sampleID}".bbduk.adapterstats.txt" \
       overwrite=T
   else
-    ln -s ${read1} ${sampleID}".R1.pre.fastq.gz"
-    ln -s ${read2} ${sampleID}".R2.pre.fastq.gz"
 
     reformat.sh ${taskmem} \
       in1=${sampleID}".R1.pre.fastq.gz" \
@@ -177,17 +173,16 @@ process fastp {
   file('*.json') into fastp_multiqc
 
   script:
-  def prepost = "${reads}"[0] == "${sampleID}.R1.bbduk.fastq.gz" ? "post" : "pre"
   def count = "${reads}"[1] == null ? "single" : "paired"
   """
   if [[ ${count} == "paired" ]]; then
     fastp -w ${task.cpus} \
-      -j ${sampleID}.${prepost}.fastp.json \
+      -j ${sampleID}.bbduk.fastp.json \
       --in1 ${reads}[0] \
       --in2 ${reads}[1]
   else
     fastp -w ${task.cpus} \
-      -j ${sampleID}.${prepost}.fastp.json \
+      -j ${sampleID}.bbduk.fastp.json \
       --in1 ${reads}
   fi
   """
