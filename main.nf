@@ -272,7 +272,7 @@ process mltiqc {
 /* 4.0: DE analysis
 */
 
-process RNAseqR {
+process RNAseqon {
 
   publishDir "${params.outDir}", mode: "copy", pattern: "*[!.zip]"
   publishDir "${params.outDir}/${params.runID}_RNAseqR", mode: "copy", pattern: "*[.zip]"
@@ -281,8 +281,8 @@ process RNAseqR {
   file (kdirs) from de_kallisto.collect()
 
   output:
-  file("${params.runID}_RNAseqR") into completedRNAseqR
-  file("${params.runID}_RNAseqR.zip") into sendmail_RNAseqR
+  file("${params.runID}_RNAseqon") into completedRNAseqR
+  file("${params.runID}_RNAseqon.zip") into sendmail_RNAseqR
 
   when:
   params.metadataCsv && params.metadataDesign
@@ -291,9 +291,9 @@ process RNAseqR {
   def control_ref = params.controlReference == null ? "NULL" : params.controlReference
   def genome_pref = params.genomePrefix == null ? "hsapiens" : params.genomePrefix
   """
-  Rscript -e "RNAseqR::run_prep_modules_bm(metadata_csv = \\"${params.metadataCsv}\\", metadata_design = \\"${params.metadataDesign}\\", tag = \\"${params.runID}\\", output_dir = \\"${params.runID}_RNAseqR\\", data_dir = NULL, control_reference = \\"${control_ref}\\", genome_prefix = \\"${genome_pref}\\", msigdb_species = \\"${params.msigdbSpecies}\\")"
+  Rscript -e "RNAseqon::run_prep_modules_bm(metadata_csv = \\"${params.metadataCsv}\\", metadata_design = \\"${params.metadataDesign}\\", tag = \\"${params.runID}\\", output_dir = \\"${params.runID}_RNAseqR\\", data_dir = NULL, control_reference = \\"${control_ref}\\", genome_prefix = \\"${genome_pref}\\", msigdb_species = \\"${params.msigdbSpecies}\\")"
   rm Rplots.pdf
-  zip -r ${params.runID}_RNAseqR.zip ${params.runID}_RNAseqR
+  zip -r ${params.runID}_RNAseqon.zip ${params.runID}_RNAseqR
   """
 }
 
