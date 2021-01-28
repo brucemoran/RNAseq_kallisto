@@ -288,12 +288,12 @@ process RNAseqon {
   params.metadataCsv && params.metadataDesign
 
   script:
-  def control_ref = params.controlReference == null ? "NULL" : params.controlReference
+  def control_ref = params.controlRef == null ? "NULL" : params.controlRef
   def genome_pref = params.genomePrefix == null ? "hsapiens" : params.genomePrefix
   """
-  Rscript -e "RNAseqon::run_prep_modules_bm(metadata_csv = \\"${params.metadataCsv}\\", metadata_design = \\"${params.metadataDesign}\\", tag = \\"${params.runID}\\", output_dir = \\"${params.runID}_RNAseqR\\", data_dir = NULL, control_reference = \\"${control_ref}\\", genome_prefix = \\"${genome_pref}\\", msigdb_species = \\"${params.msigdbSpecies}\\")"
+  Rscript -e "RNAseqon::run_prep_modules_bm(metadata_csv = \\"${params.metadataCsv}\\", metadata_design = \\"${params.metadataDesign}\\", tag = \\"${params.runID}\\", output_dir = \\"${params.runID}_RNAseqon\\", data_dir = NULL, control_reference = \\"${control_ref}\\", genome_prefix = \\"${genome_pref}\\", msigdb_species = \\"${params.msigdbSpecies}\\")"
   rm Rplots.pdf
-  zip -r ${params.runID}_RNAseqon.zip ${params.runID}_RNAseqR
+  zip -r ${params.runID}_RNAseqon.zip ${params.runID}_RNAseqon
   """
 }
 
