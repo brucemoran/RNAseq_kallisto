@@ -100,10 +100,10 @@ sampleCsvInput.splitCsv( header: true )
 process bbduk {
 
   input:
-  set val(sampleID), file(read1), file(read2) from bbduking
+  tuple val(sampleID), file(read1), file(read2) from bbduking
 
   output:
-  set val(sampleID), file('*bbduk.fastq.gz') into (kallistoing, fastping)
+  tuple val(sampleID), file('*bbduk.fastq.gz') into (kallistoing, fastping)
 
   script:
   def taskmem = task.memory == null ? "" : "-Xmx" + javaTaskmem("${task.memory}")
@@ -166,7 +166,7 @@ process bbduk {
 process fastp {
 
   input:
-  set val(sampleID), file(reads) from fastping
+  tuple val(sampleID), file(reads) from fastping
 
   output:
   file('*.json') into fastp_multiqc
@@ -213,7 +213,7 @@ process kallisto {
   publishDir "${params.outDir}/samples", mode: "copy"
 
   input:
-  set sampleID, file(reads) from kallistoing
+  tuple sampleID, file(reads) from kallistoing
   file(kallistoindex) from kallisto_index
 
   output:
