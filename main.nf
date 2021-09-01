@@ -181,11 +181,12 @@ process fastp {
 
   output:
   file('*.json') into fastp_multiqc
+  val(paired) into dupradar_paired
 
   script:
-  def count = "${reads}"[1] == null ? "single" : "paired"
+  def paired = "${reads}"[1] == null ? "single" : "paired"
   """
-  if [[ ${count} == "paired" ]]; then
+  if [[ ${paired} == "paired" ]]; then
     fastp -w ${task.cpus} \
       -j ${sampleID}.bbduk.fastp.json \
       --in1 ${reads}[0] \
@@ -273,6 +274,7 @@ process dupRadar {
 
   input:
   file(bam) from dupradar
+  val(paired) from dupradar_paired
 
   output:
   file("dupradar") into dupradared
@@ -304,7 +306,7 @@ process dupRadar {
 
   Rscript --vanilla ${params.dupradarRscript} \
     \$gtf \
-    ${params.paired} \
+    ${paired} \
     \$strand \
     ${task.cpus}
   } 2>&1 | tee > dupradar/dupradar.log.txt"
