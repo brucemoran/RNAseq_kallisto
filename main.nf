@@ -17,12 +17,15 @@ def helpMessage() {
               -profile Configuration profile (required: genome or sonic, or DIY) \
               --sampleCsv "path/to/sample.csv" \
               --cdna  "ftp://ftp.ensembl.org/pub/release-98/fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz" \
+              --gtf "http://ftp.ensembl.org/pub/release-98/gtf/homo_sapiens/Homo_sapiens.GRCh38.98.gtf.gz" \
               --stranded  "rf-stranded"
 
     Mandatory arguments:
         --sampleCsv       [file]  CSV format, header to include "sampleID,read1,read2" in case of paired data; no read2 for single-end
 
         --runID           [str]   string naming run and output files
+
+        --gtf             [str]   gtf file (absolute path or URL)
 
       One of:
         --kallistoindex   [str]   suitable kallisto index
@@ -33,6 +36,8 @@ def helpMessage() {
         --email           [str]   email address to send RNAseqR, multiQC reports
 
         --stranded        [str]   if data is fr- (first read forward) or rf-stranded (first read reverse), or not stranded (default: "")
+
+        --dupradar        [bool]  run dupRadar to determine PCR contaminants (default:TRUE)
 
         --metadataCsv     [file]  CSV format, header to include "sample" and any other covariates to use in DE analysis
 
@@ -71,6 +76,8 @@ sampleInputs = Channel.fromPath("$params.sampleCsv")
 */
 process endedness {
 
+  label 'low_mem'
+
   input:
   file(txt) from sampleInputs
 
@@ -98,6 +105,8 @@ sampleCsvInput.splitCsv( header: true )
 /* 1.0: Input trimming
  */
 process bbduk {
+
+  label 'med_mem'
 
   input:
   tuple val(sampleID), file(read1), file(read2) from bbduking
@@ -165,6 +174,8 @@ process bbduk {
 
 process fastp {
 
+  label 'med_mem'
+
   input:
   tuple val(sampleID), file(reads) from fastping
 
@@ -210,6 +221,8 @@ process kallistondx {
 */
 process kallisto {
 
+  label 'med_mem'
+
   publishDir "${params.outDir}/samples", mode: "copy"
 
   input:
@@ -219,6 +232,7 @@ process kallisto {
   output:
   file("${sampleID}") into de_kallisto
   file("${sampleID}/kallisto/${sampleID}.kallisto.log.txt") into kallisto_multiqc
+  file("${sampleID}.bam") into dupradar
 
   script:
   def stranding = params.stranded == "" ? "" : "--${params.stranded}"
@@ -231,6 +245,7 @@ process kallisto {
       -t 10 \
       -b 100 \
       -i ${kallistoindex} \
+      --pseudobam \
       -o ${sampleID}/kallisto ${stranding} ${reads}
 
   else
@@ -241,18 +256,66 @@ process kallisto {
       -l 200 \
       -s 30
       -i ${kallistoindex} \
+      --pseudobam \
       -o ${sampleID}/kallisto ${stranding} ${reads}
-  fi
+  fi > samtools view -Shb - > ${sampleID}.bam
   } 2>&1 | tee > ${sampleID}/kallisto/${sampleID}".kallisto.log.txt"
   """
 }
 
+/* 3.11: dupRadar
+*/
+process dupRadar {
+
+  label 'high_mem'
+
+  publishDir "${params.outDir}", mode: "copy"
+
+  input:
+  file(bam) from dupradar
+
+  output:
+  file("dupradar") into dupradared
+
+  script:
+  """
+  {
+  if [[ ${params.stranded} == "" ]]; then
+    strand=0
+  else
+    if [[ ${params.stranded} == "fr-stranded" ]]; then
+      strand=1
+    else
+      strand=2
+    fi
+  fi
+
+  ##test GTF is URL?
+  GTFURL=\$(curl --head --silent ${params.gtf} | head -n 1) | grep "OK" | wc -l)
+  if [[ \$GTFURL =~ 1 ]]; then
+    wget -o use.gtf ${params.gtf}
+    gtf="use.gtf"
+  else
+    gtf=${params.gtf}
+  fi
+
+  Rscript --vanilla ${params.dupradarRscript} \
+    \$gtf \
+    ${params.paired} \
+    \$strand \
+    ${task.cpus}
+  } 2>&1 | tee > dupradar/dupradar.log.txt"
+  """
+}
+
 /* 3.0: MultiQC
- * NB bbduk_multiqc output not available for multic yet 130718
+ * NB bbduk_multiqc output not available for multiqc yet 130718
 */
 fastp_multiqc.mix( kallisto_multiqc ).set { multiqc_multiqc }
 
 process mltiqc {
+
+  label 'low_mem'
 
   publishDir "${params.outDir}/multiqc", mode: "copy", pattern: "*"
 
@@ -274,8 +337,10 @@ process mltiqc {
 
 process RNAseqon {
 
+  label 'low_mem'
+
   publishDir "${params.outDir}", mode: "copy", pattern: "*[!.zip]"
-  publishDir "${params.outDir}/${params.runID}_RNAseqR", mode: "copy", pattern: "*[.zip]"
+  publishDir "${params.outDir}/${params.runID}_RNAseqon", mode: "copy", pattern: "*[.zip]"
 
   input:
   file (kdirs) from de_kallisto.collect()
