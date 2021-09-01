@@ -115,7 +115,7 @@ process bbduk {
   tuple val(sampleID), val(paired), file('*bbduk.fastq.gz') into (kallistoing, fastping)
 
   script:
-  def paired = "${read2}" == null ? "single" : "paired"
+  paired = "${read2}" == null ? "single" : "paired"
   def taskmem = task.memory == null ? "" : "-Xmx" + javaTaskmem("${task.memory}")
   """
   {
