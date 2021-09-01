@@ -112,14 +112,14 @@ process bbduk {
   tuple val(sampleID), file(read1), file(read2) from bbduking
 
   output:
-  tuple val(sampleID), file('*bbduk.fastq.gz') into (kallistoing, fastping)
+  tuple val(sampleID), val(paired), file('*bbduk.fastq.gz') into (kallistoing, fastping)
 
   script:
+  def paired = "${read2}" == null ? "single" : "paired"
   def taskmem = task.memory == null ? "" : "-Xmx" + javaTaskmem("${task.memory}")
   """
   {
-  TESTR2=\$(echo ${read2} | perl -ane 'if(\$_=~m/q.gz/){print "FQ";}')
-  if [[ \$TESTR2 != "FQ" ]]; then
+  if [[ ${paired} == "single" ]]; then
    reformat.sh ${taskmem} \
       in=${read1} \
       out="stdin.fastq" \
@@ -177,11 +177,10 @@ process fastp {
   label 'med_mem'
 
   input:
-  tuple val(sampleID), file(reads) from fastping
+  tuple val(sampleID), val(paired), file(reads) from fastping
 
   output:
   file('*.json') into fastp_multiqc
-  val(paired) into dupradar_paired
 
   script:
   def paired = "${reads}"[1] == null ? "single" : "paired"
@@ -227,13 +226,13 @@ process kallisto {
   publishDir "${params.outDir}/samples", mode: "copy"
 
   input:
-  tuple sampleID, file(reads) from kallistoing
+  tuple sampleID, val(paired), file(reads) from kallistoing
   file(kallistoindex) from kallisto_index
 
   output:
   file("${sampleID}") into de_kallisto
   file("${sampleID}/kallisto/${sampleID}.kallisto.log.txt") into kallisto_multiqc
-  file("${sampleID}.bam") into dupradar
+  tuple val(paired), file("${sampleID}.bam") into dupradar
 
   script:
   def stranding = params.stranded == "" ? "" : "--${params.stranded}"
@@ -273,8 +272,7 @@ process dupRadar {
   publishDir "${params.outDir}", mode: "copy"
 
   input:
-  file(bam) from dupradar
-  val(paired) from dupradar_paired
+  tuple val(paired), file(bam) from dupradar.collect()
 
   output:
   file("dupradar") into dupradared
@@ -296,7 +294,7 @@ process dupRadar {
   fi
 
   ##test GTF is URL?
-  GTFURL=\$(curl --head --silent ${params.gtf} | head -n 1) | grep "OK" | wc -l)
+  GTFURL=\$(curl --head --silent ${params.gtf} | head -n 1 | grep "OK" | wc -l)
   if [[ \$GTFURL =~ 1 ]]; then
     wget -o use.gtf ${params.gtf}
     gtf="use.gtf"
