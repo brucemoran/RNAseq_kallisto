@@ -106,7 +106,7 @@ sampleCsvInput.splitCsv( header: true )
  */
 process bbduk {
 
-  label 'med_mem'
+  label 'high_mem'
 
   input:
   tuple val(sampleID), file(read1), file(read2) from bbduking
