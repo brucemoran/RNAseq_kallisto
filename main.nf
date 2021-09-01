@@ -247,7 +247,7 @@ process kallisto {
       -b 100 \
       -i ${kallistoindex} \
       --pseudobam \
-      -o ${sampleID}/kallisto ${stranding} ${reads} > samtools view -Shb - > ${sampleID}.bam
+      -o ${sampleID}/kallisto ${stranding} ${reads} | samtools view -Shb - > ${sampleID}.bam
 
   else
     kallisto quant \
@@ -258,7 +258,7 @@ process kallisto {
       -s 30
       -i ${kallistoindex} \
       --pseudobam \
-      -o ${sampleID}/kallisto ${stranding} ${reads} > samtools view -Shb - > ${sampleID}.bam
+      -o ${sampleID}/kallisto ${stranding} ${reads} | samtools view -Shb - > ${sampleID}.bam
   fi
   } 2>&1 | tee > ${sampleID}/kallisto/${sampleID}".kallisto.log.txt"
   """
